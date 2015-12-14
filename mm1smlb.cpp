@@ -190,13 +190,13 @@ int main()  /* Main function. */
 	fprintf(outfile, "\ntotal_damaged_delay: %f", total_damaged_delay);
 	fprintf(outfile, "\ntotal_undamaged_delay: %f", total_undamaged_delay);
 
-	fprintf(outfile, "\nfirst_server_utilization: %f", first_server_utilization);
+	fprintf(outfile, "\n\nfirst_server_utilization: %f", first_server_utilization);
 	fprintf(outfile, "\nassembly_server_utilization: %f", assembly_server_utilization);
 	fprintf(outfile, "\nfixing_server_utilization: %f", fixing_server_utilization);
 	fprintf(outfile, "\nparts_server_utilization[ITEM_TYPE_JACKET]: %f", parts_server_utilization[ITEM_TYPE_JACKET]);
 	fprintf(outfile, "\nparts_server_utilization[ITEM_TYPE_PANT]: %f", parts_server_utilization[ITEM_TYPE_PANT]);
 
-	fprintf(outfile, "\nfirst_queue_length: %f", first_queue_length);
+	fprintf(outfile, "\n\nfirst_queue_length: %f", first_queue_length);
 	fprintf(outfile, "\nfixing_queue_length: %f", fixing_queue_length);
 	fprintf(outfile, "\nparts_queue_length[ITEM_TYPE_JACKET]: %f", parts_queue_length[ITEM_TYPE_JACKET]);
 	fprintf(outfile, "\nparts_queue_length[ITEM_TYPE_PANT]: %f", parts_queue_length[ITEM_TYPE_PANT]);
@@ -281,11 +281,14 @@ void init_probability_distribution()
 void event_arrive()
 {
 	float event_time = transfer[EVENT_TIME];
-	//check if server is busy
+
+	//set suite arrive time
+	transfer[ATTR_SYSTEM_ARRIVAL] = event_time;
+
+	//check if we should add to queue
 	if (is_queue_busy(LIST_QUEUE_FIRST_SERVER) || is_server_busy(LIST_FIRST_SERVER))
 	{
 		//add to queue
-		transfer[ATTR_SYSTEM_ARRIVAL] = event_time;
 		list_file(LAST, LIST_QUEUE_FIRST_SERVER);
 	}
 	else 
@@ -293,23 +296,30 @@ void event_arrive()
 		//add user to server
 		set_server_status(true, LIST_FIRST_SERVER);
 		//schedule departure with system arrival
-		float t = sim_time + expon(MEAN_FIRST_SERVER_SERVICE_TIME, STREAM_FIRST_SERVER_SERVICE_TIME);
-		event_schedule(t, EVENT_DEPARTURE_FIRST_SERVER);
+		event_schedule(sim_time + expon(MEAN_FIRST_SERVER_SERVICE_TIME, STREAM_FIRST_SERVER_SERVICE_TIME),
+			EVENT_DEPARTURE_FIRST_SERVER);
 	}
 
 	//schedule next arrival
-	float t = sim_time + expon(MEAN_INTERARRIVAL_FIRST_SERVER, STREAM_INTERARRIVAL);
-	event_schedule(t, EVENT_ARRIVEL_SYSTEM);
+	event_schedule(sim_time + expon(MEAN_INTERARRIVAL_FIRST_SERVER, STREAM_INTERARRIVAL), EVENT_ARRIVEL_SYSTEM);
 		
 
 }
 void first_server_departure()
 {
-	//remove current suit from the dry cleaner
+	//remove current suite from the dry cleaner
 	set_server_status(false, LIST_FIRST_SERVER);
+
+	//save the arrival as transfer will be messed up when we scedule a parts departure event
+	int suite_system_arrival = transfer[ATTR_SYSTEM_ARRIVAL];
+
 	//split suit, and let each item go to its corresponding server
 	for (int i = 0; i < ITEM_COUNT; i++)
 	{
+		//set this item info
+		transfer[ATTR_ITEM_TYPE] = i;
+		transfer[ATTR_SYSTEM_ARRIVAL] = suite_system_arrival;
+
 		//check if we should add to queue
 		if (is_queue_busy(LIST_QUEUE_PARTS_SERVER[i]) || is_server_busy(LIST_PARTS_SERVER[i]))
 		{
@@ -320,6 +330,7 @@ void first_server_departure()
 		{
 			//add to parts server
 			set_server_status(true, LIST_PARTS_SERVER[i]);
+
 			//schedule departure event
 			transfer[EVENT_ATTR_ITEM_TYPE] = i;
 			event_schedule(sim_time+expon(MEAN_PARTS_SERVICE_TIME[i], STREAM_PARTS_SERVER_SERVICE_TIME[i]), EVENT_DEPARTURE_PARTS_SERVER);
