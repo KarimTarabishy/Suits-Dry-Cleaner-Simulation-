@@ -6,9 +6,6 @@ extern "C"
 #include <string>
 #include <fstream>
 
-//counters
-int COUNT_ARRIAVAL = 0;
-
 
 //types
 #define ITEM_COUNT 2
@@ -16,7 +13,7 @@ int COUNT_ARRIAVAL = 0;
 #define ITEM_TYPE_PANT 1
 #define ITEM_STATUS_DAMAGED 0
 #define ITEM_STATUS_UNDAMAGED 1
-const float PROBABILITY_OF_DAMAGED[] = {0.05, 0.10};
+constexpr float PROBABILITY_OF_DAMAGED[] = {0.05, 0.10};
 
 //Events
 #define EVENT_ARRIVEL_SYSTEM					1  
@@ -31,11 +28,11 @@ const float PROBABILITY_OF_DAMAGED[] = {0.05, 0.10};
 
 //streams
 #define STREAM_FIRST_SERVER_SERVICE_TIME		1 
-const int STREAM_PARTS_SERVER_SERVICE_TIME[] = { 2,3 };
-const int STREAM_ASSEMBLER_SERVER_SERVICE_TIME[] = { 5,4};
+constexpr int STREAM_PARTS_SERVER_SERVICE_TIME[] = { 2,3 };
+constexpr int STREAM_ASSEMBLER_SERVER_SERVICE_TIME[] = { 5,4};
 #define STREAM_FIXING_SERVER_SERVICE_TIME		6
 #define STREAM_INTERARRIVAL						7
-const int STREAM_ITEM_STATUS[] = { 8,9 };
+constexpr int STREAM_ITEM_STATUS[] = { 8,9 };
 
 //event attributes
 #define EVENT_ATTR_ITEM_TYPE					3
@@ -47,24 +44,25 @@ const int STREAM_ITEM_STATUS[] = { 8,9 };
 
 //server lists
 #define LIST_FIRST_SERVER						1
-const int LIST_PARTS_SERVER[] = { 2, 3 };
+constexpr int LIST_PARTS_SERVER[] =			{ 2,3 };
 #define LIST_ASSEMBLY_SERVER					4
 #define LIST_FIXING_SERVER						5
 
 //queue lists
 #define LIST_QUEUE_FIRST_SERVER					6
-const int LIST_QUEUE_PARTS_SERVER[] =	{ 7,8 };
-const int LIST_QUEUE_ASSEMBLY_SERVER[] ={ 9,10 };
+constexpr int LIST_QUEUE_PARTS_SERVER[] =	{ 7,8 };
+constexpr int LIST_QUEUE_ASSEMBLY_SERVER[] ={ 9,10 };
 #define LIST_QUEUE_FIXING_SERVER					11
 
 
 //settings [TIME IS IN MINUTES]
-#define SIMULATION_PERIOD						48 * 60 
+#define SIMULATION_PERIOD						12 * 60 
 #define MEAN_INTERARRIVAL_FIRST_SERVER			10 
 #define MEAN_FIRST_SERVER_SERVICE_TIME			6
-const int MEAN_PARTS_SERVICE_TIME[] = { 4, 5 };
-const int MEAN_ASSEMBLER_SERVICE_TIME[] = { 8, 5 };
+constexpr int MEAN_PARTS_SERVICE_TIME[] =		{ 4,5 };
+constexpr int MEAN_ASSEMBLER_SERVICE_TIME[] =	{ 8,5 };
 #define MEAN_FIXING_SERVER_SERVICE_TIME			12
+float probability_distribution[2][3]; //simlib random int start from 1, so use 3 indices though we only need 2
 
 
 bool stop_simulation = false;
@@ -74,6 +72,7 @@ int iter = 1;
 FILE* outfile;
 
 void init_model();
+void init_probability_distribution();
 void event_arrive();
 void first_server_departure();
 void parts_server_departure();
@@ -104,6 +103,8 @@ int main()  /* Main function. */
 	init_simlib();
 	/* Set maxatr = max(maximum number of attributes per record, 4) */
 	maxatr = 6;  /* NEVER SET maxatr TO BE SMALLER THAN 4. */
+
+	init_probability_distribution();
 
 	float total_damaged_delay = 0, total_undamaged_delay = 0;
 	float first_server_utilization = 0, assembly_server_utilization = 0, fixing_server_utilization = 0;
@@ -150,8 +151,6 @@ int main()  /* Main function. */
 
 		report();
 		
-		std::cout << "\n\n\nTotal arrivals is                            " + COUNT_ARRIAVAL << std::endl;
-
 		total_damaged_delay += sampst(0, -SAMPSET_DAMAGED_TIME_DELAY);
 		total_undamaged_delay += sampst(0, -SAMPSET_UNDAMAGED_TIME_DELAY);
 
@@ -272,6 +271,13 @@ void init_model()
 	event_schedule(sim_time+SIMULATION_PERIOD, EVENT_END);
 
 }
+void init_probability_distribution()
+{
+	probability_distribution[ITEM_TYPE_JACKET][ITEM_STATUS_DAMAGED+1] = PROBABILITY_OF_DAMAGED[ITEM_TYPE_JACKET];
+	probability_distribution[ITEM_TYPE_JACKET][ITEM_STATUS_UNDAMAGED+1] = 1 - PROBABILITY_OF_DAMAGED[ITEM_TYPE_JACKET];
+	probability_distribution[ITEM_TYPE_PANT][ITEM_STATUS_DAMAGED+1] = PROBABILITY_OF_DAMAGED[ITEM_TYPE_PANT];
+	probability_distribution[ITEM_TYPE_PANT][ITEM_STATUS_UNDAMAGED+1] = 1 - PROBABILITY_OF_DAMAGED[ITEM_TYPE_PANT];
+}
 void event_arrive()
 {
 	float event_time = transfer[EVENT_TIME];
@@ -281,8 +287,6 @@ void event_arrive()
 		//add to queue
 		transfer[ATTR_SYSTEM_ARRIVAL] = event_time;
 		list_file(LAST, LIST_QUEUE_FIRST_SERVER);
-		std::cout << "\n\n\nthis arrival happened at \t\t";
-		std::cout << sim_time << std::endl;
 	}
 	else 
 	{
@@ -340,7 +344,7 @@ void parts_server_departure()
 	set_server_status(false, LIST_PARTS_SERVER[item_type]);
 
 	//check if this item would be damadged
-	transfer[ATTR_ITEM_STATUS] = shouldBeDamadged(item_type) ? ITEM_STATUS_UNDAMAGED:ITEM_STATUS_DAMAGED;
+	transfer[ATTR_ITEM_STATUS] = shouldBeDamadged(item_type) ? ITEM_STATUS_DAMAGED:ITEM_STATUS_UNDAMAGED;
 
 	// check if the assembly server busy
 	if (is_server_busy(LIST_ASSEMBLY_SERVER))
@@ -406,7 +410,7 @@ void assembly_server_departure()
 			//add user to server
 			set_server_status(true, LIST_FIXING_SERVER);
 			//schedule departure with system arrival
-			event_schedule(sim_time + expon(MEAN_FIXING_SERVER_SERVICE_TIME, STREAM_FIXING_SERVER_SERVICE_TIME), EVENT_DEPARTURE_FIXING_SERVER);
+			event_schedule(sim_time+expon(MEAN_FIXING_SERVER_SERVICE_TIME, STREAM_FIXING_SERVER_SERVICE_TIME), EVENT_DEPARTURE_FIXING_SERVER);
 		}
 	}
 	else
@@ -478,23 +482,13 @@ int assemble_suite_items()
 }
 bool shouldBeDamadged(int item_type)
 {
-	static float probability_distribution[2][2];
-	probability_distribution[ITEM_TYPE_JACKET][ITEM_STATUS_DAMAGED] = PROBABILITY_OF_DAMAGED[ITEM_TYPE_JACKET];
-	probability_distribution[ITEM_TYPE_JACKET][ITEM_STATUS_UNDAMAGED] = 1- PROBABILITY_OF_DAMAGED[ITEM_TYPE_JACKET];
-	probability_distribution[ITEM_TYPE_PANT][ITEM_STATUS_DAMAGED] = PROBABILITY_OF_DAMAGED[ITEM_TYPE_PANT];
-	probability_distribution[ITEM_TYPE_PANT][ITEM_STATUS_UNDAMAGED] = 1 - PROBABILITY_OF_DAMAGED[ITEM_TYPE_PANT];
-
-	if (item_type == ITEM_TYPE_JACKET)
+	//if item type invalid end
+	if (item_type < 0 || item_type >= ITEM_COUNT)
 	{
-		return random_integer(probability_distribution[ITEM_TYPE_JACKET], STREAM_ITEM_STATUS[ITEM_TYPE_JACKET]) == ITEM_STATUS_DAMAGED+1;
-	}
-	else if (item_type == ITEM_TYPE_PANT)
-	{
-		return random_integer(probability_distribution[ITEM_TYPE_PANT], STREAM_ITEM_STATUS[ITEM_TYPE_PANT]) == ITEM_STATUS_DAMAGED + 1;
+		throw std::runtime_error("Item type " + std::to_string(item_type) + " is invalid.");
 	}
 
-	std::cout << "\n >>> UNKNOWN ITEM ENTERED .......\n";
-	return false;
+	return random_integer(probability_distribution[ITEM_TYPE_PANT], STREAM_ITEM_STATUS[ITEM_TYPE_PANT]) == ITEM_STATUS_DAMAGED + 1;
 }
 
 void report(void)  
