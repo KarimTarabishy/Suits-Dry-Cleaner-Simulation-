@@ -6,6 +6,9 @@ extern "C"
 #include <string>
 #include <fstream>
 
+//counters
+int COUNT_ARRIAVAL = 0;
+
 
 //types
 #define ITEM_COUNT 2
@@ -13,7 +16,7 @@ extern "C"
 #define ITEM_TYPE_PANT 1
 #define ITEM_STATUS_DAMAGED 0
 #define ITEM_STATUS_UNDAMAGED 1
-constexpr float PROBABILITY_OF_DAMAGED[] = {0.05, 0.10};
+const float PROBABILITY_OF_DAMAGED[] = {0.05, 0.10};
 
 //Events
 #define EVENT_ARRIVEL_SYSTEM					1  
@@ -28,11 +31,11 @@ constexpr float PROBABILITY_OF_DAMAGED[] = {0.05, 0.10};
 
 //streams
 #define STREAM_FIRST_SERVER_SERVICE_TIME		1 
-constexpr int STREAM_PARTS_SERVER_SERVICE_TIME[] = { 2,3 };
-constexpr int STREAM_ASSEMBLER_SERVER_SERVICE_TIME[] = { 5,4};
+const int STREAM_PARTS_SERVER_SERVICE_TIME[] = { 2,3 };
+const int STREAM_ASSEMBLER_SERVER_SERVICE_TIME[] = { 5,4};
 #define STREAM_FIXING_SERVER_SERVICE_TIME		6
 #define STREAM_INTERARRIVAL						7
-constexpr int STREAM_ITEM_STATUS[] = { 8,9 };
+const int STREAM_ITEM_STATUS[] = { 8,9 };
 
 //event attributes
 #define EVENT_ATTR_ITEM_TYPE					3
@@ -44,23 +47,23 @@ constexpr int STREAM_ITEM_STATUS[] = { 8,9 };
 
 //server lists
 #define LIST_FIRST_SERVER						1
-constexpr int LIST_PARTS_SERVER[] =			{ 2,3 };
+const int LIST_PARTS_SERVER[] = { 2, 3 };
 #define LIST_ASSEMBLY_SERVER					4
 #define LIST_FIXING_SERVER						5
 
 //queue lists
 #define LIST_QUEUE_FIRST_SERVER					6
-constexpr int LIST_QUEUE_PARTS_SERVER[] =	{ 7,8 };
-constexpr int LIST_QUEUE_ASSEMBLY_SERVER[] ={ 9,10 };
+const int LIST_QUEUE_PARTS_SERVER[] =	{ 7,8 };
+const int LIST_QUEUE_ASSEMBLY_SERVER[] ={ 9,10 };
 #define LIST_QUEUE_FIXING_SERVER					11
 
 
 //settings [TIME IS IN MINUTES]
-#define SIMULATION_PERIOD						12 * 60 
+#define SIMULATION_PERIOD						48 * 60 
 #define MEAN_INTERARRIVAL_FIRST_SERVER			10 
 #define MEAN_FIRST_SERVER_SERVICE_TIME			6
-constexpr int MEAN_PARTS_SERVICE_TIME[] =		{ 4,5 };
-constexpr int MEAN_ASSEMBLER_SERVICE_TIME[] =	{ 8,5 };
+const int MEAN_PARTS_SERVICE_TIME[] = { 4, 5 };
+const int MEAN_ASSEMBLER_SERVICE_TIME[] = { 8, 5 };
 #define MEAN_FIXING_SERVER_SERVICE_TIME			12
 
 
@@ -147,6 +150,8 @@ int main()  /* Main function. */
 
 		report();
 		
+		std::cout << "\n\n\nTotal arrivals is                            " + COUNT_ARRIAVAL << std::endl;
+
 		total_damaged_delay += sampst(0, -SAMPSET_DAMAGED_TIME_DELAY);
 		total_undamaged_delay += sampst(0, -SAMPSET_UNDAMAGED_TIME_DELAY);
 
@@ -276,6 +281,8 @@ void event_arrive()
 		//add to queue
 		transfer[ATTR_SYSTEM_ARRIVAL] = event_time;
 		list_file(LAST, LIST_QUEUE_FIRST_SERVER);
+		std::cout << "\n\n\nthis arrival happened at \t\t";
+		std::cout << sim_time << std::endl;
 	}
 	else 
 	{
@@ -333,7 +340,7 @@ void parts_server_departure()
 	set_server_status(false, LIST_PARTS_SERVER[item_type]);
 
 	//check if this item would be damadged
-	transfer[ATTR_ITEM_STATUS] = shouldBeDamadged(item_type) ? ITEM_STATUS_DAMAGED:ITEM_STATUS_UNDAMAGED;
+	transfer[ATTR_ITEM_STATUS] = shouldBeDamadged(item_type) ? ITEM_STATUS_UNDAMAGED:ITEM_STATUS_DAMAGED;
 
 	// check if the assembly server busy
 	if (is_server_busy(LIST_ASSEMBLY_SERVER))
@@ -399,7 +406,7 @@ void assembly_server_departure()
 			//add user to server
 			set_server_status(true, LIST_FIXING_SERVER);
 			//schedule departure with system arrival
-			event_schedule(sim_time+expon(MEAN_FIXING_SERVER_SERVICE_TIME, STREAM_FIXING_SERVER_SERVICE_TIME), EVENT_DEPARTURE_FIXING_SERVER);
+			event_schedule(sim_time + expon(MEAN_FIXING_SERVER_SERVICE_TIME, STREAM_FIXING_SERVER_SERVICE_TIME), EVENT_DEPARTURE_FIXING_SERVER);
 		}
 	}
 	else
